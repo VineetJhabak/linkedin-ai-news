@@ -1,0 +1,43 @@
+from playwright.sync_api import sync_playwright
+import time, json
+
+EMAIL = "your_email@gmail.com"
+PASSWORD = "your_password"
+
+def run():
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=False)
+        page = browser.new_page()
+
+        # Login
+        page.goto("https://www.linkedin.com/login")
+        page.fill('input[name="session_key"]', EMAIL)
+        page.fill('input[name="session_password"]', PASSWORD)
+        page.click('button[type="submit"]')
+
+        time.sleep(5)
+
+        # Go to feed
+        page.goto("https://www.linkedin.com/feed/")
+        time.sleep(5)
+
+        # Click start post
+        page.click("text=Start a post")
+        time.sleep(3)
+
+        # Load your generated post
+        with open("post.txt") as f:
+            content = f.read()
+
+        page.fill('div[role="textbox"]', content)
+        time.sleep(2)
+
+        # Click Post
+        page.click("button:has-text('Post')")
+
+        print("✅ Posted successfully!")
+
+        time.sleep(5)
+        browser.close()
+
+run()
