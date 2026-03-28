@@ -22,7 +22,7 @@ jobs:
           cache: 'pip'
 
       - name: 📦 Install dependencies
-        run: pip install requests python-dotenv
+        run: pip install -r requirements.txt
 
       - name: 🌐 Fetch Top 10 AI News
         env:
