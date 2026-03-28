@@ -27,7 +27,7 @@ jobs:
       - name: 🌐 Fetch Top 10 AI News
         env:
           NEWS_API_KEY: ${{ secrets.NEWS_API_KEY }}
-        run: python scripts/fetch_news.py
+        run: python fetch_news.py
 
       - name: 🤖 Generate Post (Gemini Free)
         env:
