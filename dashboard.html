@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LinkedIn AI News Automator</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a24;
+    --surface3: #22222e;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.15);
+    --accent: #6366f1;
+    --accent2: #818cf8;
+    --green: #22c55e;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --text: #f1f0ff;
+    --text2: #9d9db8;
+    --text3: #5c5c7a;
+    --glow: 0 0 40px rgba(99,102,241,0.15);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Space Grotesk', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: 
+      linear-gradient(rgba(99,102,241,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(99,102,241,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .layout { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; position: relative; z-index: 1; }
+
+  /* Sidebar */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 24px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px;
+    margin-bottom: 16px;
+  }
+
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--accent), #a78bfa);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+
+  .logo-text { font-size: 15px; font-weight: 600; }
+  .logo-sub { font-size: 11px; color: var(--text3); font-weight: 400; }
+
+  .nav-section { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 1.5px; padding: 16px 12px 8px; }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text2);
+    transition: all 0.2s;
+    border: 1px solid transparent;
+  }
+
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: rgba(99,102,241,0.15); color: var(--accent2); border-color: rgba(99,102,241,0.25); }
+  .nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
+
+  .status-badge {
+    margin-top: auto;
+    padding: 12px;
+    background: rgba(34,197,94,0.08);
+    border: 1px solid rgba(34,197,94,0.2);
+    border-radius: 10px;
+  }
+
+  .status-dot { width: 8px; height: 8px; background: var(--green); border-radius: 50%; display: inline-block; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.6;transform:scale(0.9)} }
+
+  /* Main content */
+  .main { padding: 32px; display: flex; flex-direction: column; gap: 24px; }
+
+  .page-header { display: flex; justify-content: space-between; align-items: flex-start; }
+  .page-title { font-size: 26px; font-weight: 700; }
+  .page-sub { font-size: 13px; color: var(--text2); margin-top: 4px; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+  }
+
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { background: #5558e8; transform: translateY(-1px); box-shadow: var(--glow); }
+  .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border2); }
+  .btn-ghost:hover { background: var(--surface3); }
+  .btn-green { background: rgba(34,197,94,0.15); color: var(--green); border: 1px solid rgba(34,197,94,0.3); }
+
+  /* Stats row */
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), transparent);
+  }
+
+  .stat-label { font-size: 12px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .stat-value { font-size: 28px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+  .stat-change { font-size: 12px; color: var(--green); margin-top: 6px; }
+  .stat-icon { position: absolute; top: 20px; right: 20px; font-size: 24px; opacity: 0.4; }
+
+  /* Content area */
+  .content-grid { display: grid; grid-template-columns: 1fr 360px; gap: 24px; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+  }
+
+  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .card-title { font-size: 15px; font-weight: 600; }
+
+  /* News preview cards */
+  .news-item {
+    display: flex;
+    gap: 14px;
+    padding: 16px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 12px;
+    transition: border-color 0.2s;
+  }
+
+  .news-item:hover { border-color: var(--border2); }
+
+  .news-rank {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--accent2);
+    font-weight: 600;
+    min-width: 24px;
+    margin-top: 2px;
+  }
+
+  .news-content { flex: 1; }
+  .news-flag { font-size: 18px; margin-right: 6px; }
+  .news-title { font-size: 13px; font-weight: 600; margin-bottom: 6px; line-height: 1.4; }
+  .news-excerpt { font-size: 12px; color: var(--text2); line-height: 1.5; }
+  .news-meta { display: flex; gap: 10px; margin-top: 8px; align-items: center; }
+  .news-tag {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(99,102,241,0.15);
+    color: var(--accent2);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+  }
+  .news-words { font-size: 11px; color: var(--text3); }
+
+  .news-tag.green { background: rgba(34,197,94,0.12); color: var(--green); }
+  .news-tag.amber { background: rgba(245,158,11,0.12); color: var(--amber); }
+
+  /* Schedule panel */
+  .schedule-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border-radius: 10px;
+    background: var(--surface2);
+    margin-bottom: 10px;
+  }
+
+  .schedule-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent2);
+    min-width: 60px;
+  }
+
+  .schedule-status { margin-left: auto; }
+
+  /* Post preview */
+  .post-preview {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--text2);
+    white-space: pre-wrap;
+    font-family: 'Space Grotesk', sans-serif;
+    max-height: 320px;
+    overflow-y: auto;
+  }
+
+  .post-preview::-webkit-scrollbar { width: 4px; }
+  .post-preview::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 4px; }
+
+  /* Progress bar */
+  .progress-bar {
+    height: 4px;
+    background: var(--surface3);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), #a78bfa);
+    border-radius: 2px;
+    transition: width 0.5s ease;
+  }
+
+  /* Toggle */
+  .toggle {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    display: inline-block;
+  }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: var(--surface3);
+    border-radius: 12px;
+    transition: 0.3s;
+    border: 1px solid var(--border2);
+  }
+  .toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 18px; height: 18px;
+    left: 2px; top: 2px;
+    background: white;
+    border-radius: 50%;
+    transition: 0.3s;
+  }
+  .toggle input:checked + .toggle-slider { background: var(--accent); border-color: var(--accent); }
+  .toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
+
+  /* Table */
+  .log-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .log-table th { text-align: left; padding: 8px 12px; color: var(--text3); text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+  .log-table td { padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.04); color: var(--text2); }
+  .log-table tr:hover td { background: rgba(255,255,255,0.02); }
+  .log-table .mono { font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .badge-green { background: rgba(34,197,94,0.12); color: var(--green); }
+  .badge-amber { background: rgba(245,158,11,0.12); color: var(--amber); }
+  .badge-red { background: rgba(239,68,68,0.12); color: var(--red); }
+
+  /* Setup wizard */
+  .setup-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 16px;
+    background: var(--surface2);
+    border-radius: 12px;
+    margin-bottom: 10px;
+    border: 1px solid var(--border);
+  }
+
+  .step-num {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: rgba(99,102,241,0.2);
+    border: 1px solid rgba(99,102,241,0.4);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent2);
+    flex-shrink: 0;
+  }
+
+  .step-num.done { background: rgba(34,197,94,0.15); border-color: rgba(34,197,94,0.4); color: var(--green); }
+
+  .step-content { flex: 1; }
+  .step-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .step-desc { font-size: 12px; color: var(--text2); line-height: 1.5; }
+
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    background: var(--surface3);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--accent2);
+  }
+
+  .tab-bar { display: flex; gap: 4px; background: var(--surface2); padding: 4px; border-radius: 10px; margin-bottom: 20px; }
+  .tab { padding: 8px 16px; border-radius: 7px; font-size: 13px; cursor: pointer; color: var(--text2); transition: all 0.2s; }
+  .tab.active { background: var(--surface); color: var(--text); font-weight: 500; }
+
+  .section { display: none; }
+  .section.active { display: flex; flex-direction: column; gap: 24px; }
+
+  /* Animated gradient text */
+  .gradient-text {
+    background: linear-gradient(135deg, #6366f1, #a78bfa, #818cf8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Live indicator */
+  .live-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: rgba(34,197,94,0.1);
+    border: 1px solid rgba(34,197,94,0.25);
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--green);
+  }
+
+  textarea {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  textarea:focus { border-color: var(--accent); }
+
+  input[type="text"], input[type="password"], input[type="time"] {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  input:focus { border-color: var(--accent); }
+
+  label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 6px; }
+
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  .influencer-tips {
+    background: linear-gradient(135deg, rgba(99,102,241,0.08), rgba(167,139,250,0.05));
+    border: 1px solid rgba(99,102,241,0.2);
+    border-radius: 12px;
+    padding: 20px;
+  }
+
+  .tip-item { display: flex; gap: 10px; margin-bottom: 12px; font-size: 13px; color: var(--text2); align-items: flex-start; }
+  .tip-icon { font-size: 16px; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<div class="layout">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">🤖</div>
+      <div>
+        <div class="logo-text">AI Influencer</div>
+        <div class="logo-sub">LinkedIn Automator</div>
+      </div>
+    </div>
+
+    <div class="nav-section">Navigation</div>
+    <div class="nav-item active" onclick="switchTab('dashboard')">
+      <span class="icon">📊</span> Dashboard
+    </div>
+    <div class="nav-item" onclick="switchTab('preview')">
+      <span class="icon">👁</span> Post Preview
+    </div>
+    <div class="nav-item" onclick="switchTab('setup')">
+      <span class="icon">⚙️</span> Setup Guide
+    </div>
+    <div class="nav-item" onclick="switchTab('logs')">
+      <span class="icon">📋</span> Activity Log
+    </div>
+    <div class="nav-item" onclick="switchTab('tips')">
+      <span class="icon">🚀</span> Growth Tips
+    </div>
+
+    <div class="nav-section" style="margin-top: 12px;">System</div>
+    <div class="nav-item" onclick="switchTab('config')">
+      <span class="icon">🔑</span> Configuration
+    </div>
+
+    <div class="status-badge" style="margin-top: auto;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <span class="status-dot"></span>
+        <span style="font-size:12px;font-weight:600;color:#22c55e;">Automation Active</span>
+      </div>
+      <div style="font-size:11px;color:var(--text3);">Next post: 6:00 AM IST</div>
+      <div style="font-size:11px;color:var(--text3);">10 news items queued</div>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <main class="main">
+
+    <!-- DASHBOARD -->
+    <div id="tab-dashboard" class="section active">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">🌐 AI News Dashboard</h1>
+          <p class="page-sub">Fully automated LinkedIn posting · 6:00 AM IST daily · 10 top AI stories</p>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <div class="live-badge"><span class="status-dot" style="width:6px;height:6px;"></span> LIVE</div>
+          <button class="btn btn-primary" onclick="triggerPost()">⚡ Post Now</button>
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon">📤</div>
+          <div class="stat-label">Posts Published</div>
+          <div class="stat-value gradient-text" id="stat-posts">0</div>
+          <div class="stat-change">↑ +1 scheduled today</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">👥</div>
+          <div class="stat-label">Est. Reach</div>
+          <div class="stat-value gradient-text" id="stat-reach">0</div>
+          <div class="stat-change">↑ Growing daily</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">📰</div>
+          <div class="stat-label">News Fetched</div>
+          <div class="stat-value gradient-text" id="stat-news">10</div>
+          <div class="stat-change">Updated hourly</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">⏰</div>
+          <div class="stat-label">Next Post In</div>
+          <div class="stat-value gradient-text" id="stat-next">--:--</div>
+          <div class="stat-change">Daily at 6:00 AM IST</div>
+        </div>
+      </div>
+
+      <div class="content-grid">
+        <!-- News Queue -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">🔥 Today's AI News Queue</span>
+            <button class="btn btn-ghost" style="font-size:11px;padding:6px 12px;" onclick="refreshNews()">↻ Refresh</button>
+          </div>
+
+          <div id="news-list">
+            <!-- Injected by JS -->
+          </div>
+        </div>
+
+        <!-- Right panel -->
+        <div style="display:flex;flex-direction:column;gap:16px;">
+
+          <!-- Schedule -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">📅 Schedule</span>
+              <span class="badge badge-green">Active</span>
+            </div>
+            <div class="schedule-item">
+              <div class="schedule-time">06:00</div>
+              <div style="flex:1">
+                <div style="font-size:13px;font-weight:500;">Daily AI News Post</div>
+                <div style="font-size:11px;color:var(--text3);">IST · Mon–Sun · GitHub Actions</div>
+              </div>
+              <div class="schedule-status">
+                <span class="badge badge-green">✓ ON</span>
+              </div>
+            </div>
+            <div class="schedule-item">
+              <div class="schedule-time">05:45</div>
+              <div style="flex:1">
+                <div style="font-size:13px;font-weight:500;">News Fetch + AI Generate</div>
+                <div style="font-size:11px;color:var(--text3);">Claude API · 10 stories</div>
+              </div>
+              <span class="badge badge-green">✓ ON</span>
+            </div>
+            <div class="schedule-item">
+              <div class="schedule-time">05:50</div>
+              <div style="flex:1">
+                <div style="font-size:13px;font-weight:500;">Image Generation</div>
+                <div style="font-size:11px;color:var(--text3);">Claude Vision · 1–2 images</div>
+              </div>
+              <span class="badge badge-green">✓ ON</span>
+            </div>
+          </div>
+
+          <!-- Progress -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">📈 30-Day Goal</span>
+              <span style="font-size:12px;color:var(--text3);" id="days-count">Day 1</span>
+            </div>
+            <div style="margin-bottom:12px;">
+              <div style="font-size:12px;color:var(--text2);margin-bottom:4px;">Top AI Influencer Progress</div>
+              <div class="progress-bar"><div class="progress-fill" id="progress-bar" style="width:3%"></div></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;">
+              <div style="padding:10px;background:var(--surface2);border-radius:8px;">
+                <div style="color:var(--text3);">Connections</div>
+                <div style="font-weight:600;color:var(--text);margin-top:2px;">Growing 📈</div>
+              </div>
+              <div style="padding:10px;background:var(--surface2);border-radius:8px;">
+                <div style="color:var(--text3);">Impressions</div>
+                <div style="font-weight:600;color:var(--text);margin-top:2px;">Scaling 🚀</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- PREVIEW -->
+    <div id="tab-preview" class="section">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">👁 Post Preview</h1>
+          <p class="page-sub">See exactly what gets posted to LinkedIn</p>
+        </div>
+        <button class="btn btn-primary" onclick="generatePreview()">✨ Generate Preview</button>
+      </div>
+
+      <div class="content-grid">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">LinkedIn Post Preview</span>
+            <span class="badge badge-amber">~2,200 chars</span>
+          </div>
+          <div class="post-preview" id="post-preview">Click "Generate Preview" to see a sample AI news post...</div>
+          <div style="margin-top:12px;display:flex;gap:8px;">
+            <button class="btn btn-ghost" style="font-size:12px;" onclick="copyPost()">📋 Copy</button>
+            <button class="btn btn-green" style="font-size:12px;" onclick="triggerPost()">📤 Post to LinkedIn</button>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:16px;">
+          <div class="card">
+            <div class="card-header"><span class="card-title">🖼 AI Image</span></div>
+            <div style="background:var(--surface2);border-radius:10px;height:200px;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:13px;border:1px dashed var(--border2);">
+              Generated by Claude<br>based on top news
+            </div>
+            <div style="font-size:11px;color:var(--text3);margin-top:8px;">1-2 contextual images auto-attached per post</div>
+          </div>
+
+          <div class="card">
+            <div class="card-header"><span class="card-title">📊 Post Metrics (Estimate)</span></div>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <div style="display:flex;justify-content:space-between;font-size:13px;">
+                <span style="color:var(--text2);">Engagement Rate</span>
+                <span style="color:var(--green);font-weight:600;">3–8%</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:13px;">
+                <span style="color:var(--text2);">Impressions</span>
+                <span style="color:var(--accent2);font-weight:600;">500–5K/post</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:13px;">
+                <span style="color:var(--text2);">Hashtags</span>
+                <span style="color:var(--accent2);font-weight:600;">5 targeted</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:13px;">
+                <span style="color:var(--text2);">Word count</span>
+                <span style="color:var(--amber);font-weight:600;">100–300/story</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SETUP GUIDE -->
+    <div id="tab-setup" class="section">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">⚙️ Setup Guide</h1>
+          <p class="page-sub">5 steps to fully automated LinkedIn fame</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">🚀 One-Time Setup (15 minutes)</span>
+        </div>
+
+        <div class="setup-step">
+          <div class="step-num done">✓</div>
+          <div class="step-content">
+            <div class="step-title">Step 1: Get your API Keys (Free)</div>
+            <div class="step-desc">
+              • <strong>NewsAPI</strong>: Sign up at <code>newsapi.org</code> — Free tier: 100 req/day ✅<br>
+              • <strong>Claude API</strong>: Get key at <code>console.anthropic.com</code><br>
+              • <strong>LinkedIn</strong>: Go to <code>linkedin.com/developers</code> → Create App → OAuth2 → get Access Token<br>
+              • <strong>GitHub</strong>: Your GitHub account (already have it!)
+            </div>
+          </div>
+        </div>
+
+        <div class="setup-step">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <div class="step-title">Step 2: Fork the GitHub Repository</div>
+            <div class="step-desc">
+              Fork this repo to your GitHub: <code>github.com/YOUR_USERNAME/linkedin-ai-news</code><br><br>
+              Then go to <strong>Settings → Secrets → Actions</strong> and add:<br>
+              • <code>LINKEDIN_ACCESS_TOKEN</code> — Your LinkedIn OAuth token<br>
+              • <code>LINKEDIN_PERSON_ID</code> — Your LinkedIn URN (e.g., <code>urn:li:person:xxxxx</code>)<br>
+              • <code>ANTHROPIC_API_KEY</code> — Claude API key<br>
+              • <code>NEWS_API_KEY</code> — NewsAPI key
+            </div>
+          </div>
+        </div>
+
+        <div class="setup-step">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <div class="step-title">Step 3: Upload the Automation Scripts</div>
+            <div class="step-desc">
+              Upload these files (download below) to your forked repo:<br>
+              • <code>.github/workflows/post-ai-news.yml</code> — GitHub Actions scheduler<br>
+              • <code>scripts/fetch_news.py</code> — News fetcher<br>
+              • <code>scripts/generate_post.py</code> — Claude post generator<br>
+              • <code>scripts/post_linkedin.py</code> — LinkedIn poster<br>
+              • <code>scripts/run_all.sh</code> — Master runner
+            </div>
+          </div>
+        </div>
+
+        <div class="setup-step">
+          <div class="step-num">4</div>
+          <div class="step-content">
+            <div class="step-title">Step 4: Enable GitHub Actions</div>
+            <div class="step-desc">
+              In your repo: <strong>Actions tab → Enable workflows</strong><br>
+              The cron is set to <code>00 30 0 * * *</code> (00:30 UTC = 6:00 AM IST)<br>
+              Test it by clicking <strong>"Run workflow"</strong> manually first!
+            </div>
+          </div>
+        </div>
+
+        <div class="setup-step">
+          <div class="step-num">5</div>
+          <div class="step-content">
+            <div class="step-title">Step 5: LinkedIn Token Refresh (Monthly)</div>
+            <div class="step-desc">
+              LinkedIn access tokens expire every 60 days. Set a calendar reminder to refresh via:<br>
+              <code>https://www.linkedin.com/developers/tools/oauth/token-generator</code><br>
+              Update the secret in GitHub → Settings → Secrets → LINKEDIN_ACCESS_TOKEN
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:20px;display:flex;gap:12px;flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="downloadAll()">⬇️ Download All Scripts</button>
+          <button class="btn btn-ghost" onclick="switchTab('config')">🔑 Configure Now</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- LOGS -->
+    <div id="tab-logs" class="section">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">📋 Activity Log</h1>
+          <p class="page-sub">Full history of automated posts and system events</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Post History</span>
+          <div class="live-badge"><span class="status-dot" style="width:6px;height:6px;"></span> Live updating</div>
+        </div>
+        <table class="log-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Time</th>
+              <th>Stories</th>
+              <th>Status</th>
+              <th>Reach</th>
+            </tr>
+          </thead>
+          <tbody id="log-body">
+            <tr>
+              <td class="mono">Today</td>
+              <td class="mono">06:00 IST</td>
+              <td>Scheduled · 10 AI stories</td>
+              <td><span class="badge badge-amber">⏳ Pending</span></td>
+              <td class="mono">—</td>
+            </tr>
+            <tr>
+              <td class="mono">Setup</td>
+              <td class="mono">Now</td>
+              <td>System initialized</td>
+              <td><span class="badge badge-green">✓ Ready</span></td>
+              <td class="mono">—</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TIPS -->
+    <div id="tab-tips" class="section">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">🚀 30-Day Influencer Strategy</h1>
+          <p class="page-sub">Science-backed tips to maximize your LinkedIn AI influence</p>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div class="influencer-tips card">
+          <div class="card-title" style="margin-bottom:16px;">📅 Week 1–2: Foundation</div>
+          <div class="tip-item"><span class="tip-icon">🎯</span><span>Post at exactly 6 AM IST — highest AI professional activity window in Asia</span></div>
+          <div class="tip-item"><span class="tip-icon">🏷️</span><span>Use exactly 5 hashtags: #ArtificialIntelligence #AINews #MachineLearning + 2 trending</span></div>
+          <div class="tip-item"><span class="tip-icon">💬</span><span>Reply to every comment within 2 hours — LinkedIn algorithm heavily rewards this</span></div>
+          <div class="tip-item"><span class="tip-icon">🤝</span><span>Connect with 20 AI professionals per day using personalized messages</span></div>
+          <div class="tip-item"><span class="tip-icon">📊</span><span>Share a weekly "AI Recap" every Sunday — great for newsletter signups</span></div>
+        </div>
+
+        <div class="influencer-tips card">
+          <div class="card-title" style="margin-bottom:16px;">🔥 Week 3–4: Growth Hacks</div>
+          <div class="tip-item"><span class="tip-icon">🌍</span><span>Tag country-specific news with geotags — international stories get 3x more reach</span></div>
+          <div class="tip-item"><span class="tip-icon">📸</span><span>Images get 2x more engagement — Claude generates 1-2 relevant images per post</span></div>
+          <div class="tip-item"><span class="tip-icon">❓</span><span>End each post with a question — "What do you think?" boosts comments 40%</span></div>
+          <div class="tip-item"><span class="tip-icon">📧</span><span>Add LinkedIn Newsletter — subscribers get notified of every post automatically</span></div>
+          <div class="tip-item"><span class="tip-icon">🎙️</span><span>Go live once a week discussing that day's #1 AI story — huge reach multiplier</span></div>
+        </div>
+
+        <div class="card" style="grid-column:span 2;">
+          <div class="card-header"><span class="card-title">🎯 Optimal Post Structure (Auto-Generated)</span></div>
+          <div class="post-preview">🌟 TOP 10 AI NEWS TODAY 🌟
+━━━━━━━━━━━━━━━━━━━━━
+
+🇺🇸 #1 — OpenAI launches GPT-5 with real-time reasoning
+🤯 [100-300 word engaging summary with context and impact]
+💡 Key insight: Why this matters for professionals like you
+
+🇬🇧 #2 — DeepMind's AlphaFold 3 solves protein folding challenge
+🧬 [100-300 word engaging summary with emoji highlights]
+💡 Key insight: Real-world applications in medicine
+
+[... 8 more stories with country flags ...]
+
+━━━━━━━━━━━━━━━━━━━━━
+💭 Which of these AI breakthroughs excites you most?
+Drop your thoughts below! 👇
+
+#ArtificialIntelligence #AINews #MachineLearning #Innovation #Tech</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONFIG -->
+    <div id="tab-config" class="section">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">🔑 Configuration</h1>
+          <p class="page-sub">These values go into GitHub Secrets — never stored here</p>
+        </div>
+        <button class="btn btn-primary" onclick="saveConfig()">💾 Generate Config</button>
+      </div>
+
+      <div class="content-grid">
+        <div class="card">
+          <div class="card-header"><span class="card-title">API Credentials</span></div>
+          <div style="display:flex;flex-direction:column;gap:16px;">
+            <div>
+              <label>LinkedIn Access Token</label>
+              <input type="password" id="li-token" placeholder="AQXt3...">
+            </div>
+            <div>
+              <label>LinkedIn Person URN</label>
+              <input type="text" id="li-urn" placeholder="urn:li:person:ABC123">
+            </div>
+            <div>
+              <label>Anthropic API Key</label>
+              <input type="password" id="anthropic-key" placeholder="sk-ant-api03-...">
+            </div>
+            <div>
+              <label>NewsAPI Key (free at newsapi.org)</label>
+              <input type="password" id="news-key" placeholder="abc123def456...">
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><span class="card-title">Schedule Settings</span></div>
+          <div style="display:flex;flex-direction:column;gap:16px;">
+            <div>
+              <label>Post Time (IST)</label>
+              <input type="time" value="06:00">
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div style="font-size:13px;font-weight:500;">Auto-post enabled</div>
+                <div style="font-size:12px;color:var(--text2);">GitHub Actions cron scheduler</div>
+              </div>
+              <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div style="font-size:13px;font-weight:500;">Generate AI Images</div>
+                <div style="font-size:12px;color:var(--text2);">1–2 images per post via Claude</div>
+              </div>
+              <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div style="font-size:13px;font-weight:500;">Country flags</div>
+                <div style="font-size:12px;color:var(--text2);">Add flag emoji to each story</div>
+              </div>
+              <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div style="font-size:13px;font-weight:500;">End with question</div>
+                <div style="font-size:12px;color:var(--text2);">Boost comment engagement</div>
+              </div>
+              <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Generated GitHub Secrets Config</span></div>
+        <textarea id="config-output" rows="10" readonly placeholder="Click 'Generate Config' to see the values to copy into GitHub Secrets..."></textarea>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// --- Data ---
+const newsData = [
+  { rank: "01", flag: "🇺🇸", country: "USA", title: "OpenAI releases o3 model with unprecedented reasoning capabilities", excerpt: "OpenAI's newest reasoning model outperforms human experts on graduate-level science tests, marking a pivotal leap in AI problem-solving across physics, chemistry, and mathematics domains.", tag: "Research", tagClass: "" },
+  { rank: "02", flag: "🇬🇧", country: "UK", title: "DeepMind's Gemini Ultra 2.0 achieves 90%+ on all MMLU benchmarks", excerpt: "Google DeepMind announces Gemini Ultra 2.0 surpassing GPT-4 on every major AI benchmark, with breakthrough performance in coding, reasoning, and multimodal understanding.", tag: "Breakthrough", tagClass: "green" },
+  { rank: "03", flag: "🇨🇳", country: "China", title: "Baidu's ERNIE 5.0 challenges Western AI with Chinese language superiority", excerpt: "Baidu unveils ERNIE 5.0, dominating Chinese NLP tasks while matching GPT-4 on English benchmarks, signaling intensifying global AI competition.", tag: "Competition", tagClass: "amber" },
+  { rank: "04", flag: "🇩🇪", country: "Germany", title: "EU AI Act enforcement begins — tech giants face compliance audits", excerpt: "European regulators launch first enforcement wave of the AI Act, requiring major AI providers to submit risk assessments for high-risk systems by Q2 2025.", tag: "Policy", tagClass: "" },
+  { rank: "05", flag: "🇯🇵", country: "Japan", title: "SoftBank invests $10B in domestic AI chip manufacturing", excerpt: "SoftBank announces massive investment in domestic semiconductor production to reduce Japan's dependence on NVIDIA and build AI infrastructure sovereignty.", tag: "Investment", tagClass: "green" },
+  { rank: "06", flag: "🇮🇳", country: "India", title: "IIT Delhi's BharatGPT launches as world's first multilingual Indic AI", excerpt: "India's BharatGPT supports 22 official languages and 500+ dialects, representing a major milestone for inclusive AI that serves 1.4 billion people.", tag: "Launch", tagClass: "" },
+  { rank: "07", flag: "🇺🇸", country: "USA", title: "Anthropic raises $4B Series E — Claude 4 development accelerates", excerpt: "Anthropic secures $4 billion from Google and Amazon to accelerate Claude 4 development, focusing on constitutional AI safety and reasoning capabilities.", tag: "Funding", tagClass: "amber" },
+  { rank: "08", flag: "🇫🇷", country: "France", title: "Mistral AI's new 70B model beats GPT-3.5 at fraction of the cost", excerpt: "French AI startup Mistral AI releases a 70B parameter open-source model outperforming GPT-3.5 Turbo on coding and reasoning tasks, democratizing AI access.", tag: "Open Source", tagClass: "green" },
+  { rank: "09", flag: "🇰🇷", country: "South Korea", title: "Samsung develops in-device AI chip with 30% less power consumption", excerpt: "Samsung's Exynos 2500 AI chip brings powerful language models to smartphones offline, using 30% less battery — a major step for edge AI democratization.", tag: "Hardware", tagClass: "" },
+  { rank: "10", flag: "🇧🇷", country: "Brazil", title: "Latin America's largest AI fund launches with $500M for LATAM startups", excerpt: "Brazil-based AI fund targets generative AI, AgriTech AI, and healthcare AI across 20 Latin American countries, positioning the region as next AI frontier.", tag: "Funding", tagClass: "amber" },
+];
+
+// --- Render news list ---
+function renderNews() {
+  const list = document.getElementById('news-list');
+  list.innerHTML = newsData.map(n => `
+    <div class="news-item">
+      <div class="news-rank">#${n.rank}</div>
+      <div class="news-content">
+        <div class="news-title"><span class="news-flag">${n.flag}</span>${n.title}</div>
+        <div class="news-excerpt">${n.excerpt}</div>
+        <div class="news-meta">
+          <span class="news-tag ${n.tagClass}">${n.tag}</span>
+          <span class="news-words">~150 words</span>
+          <span class="news-words">${n.country}</span>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// --- Countdown ---
+function updateCountdown() {
+  const now = new Date();
+  const ist = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
+  const next = new Date(ist);
+  next.setHours(6, 0, 0, 0);
+  if (ist >= next) next.setDate(next.getDate() + 1);
+  const diff = next - ist;
+  const h = Math.floor(diff / 3600000);
+  const m = Math.floor((diff % 3600000) / 60000);
+  document.getElementById('stat-next').textContent = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+}
+
+// --- Animate stats ---
+function animateCount(id, target, suffix='') {
+  const el = document.getElementById(id);
+  let current = 0;
+  const step = Math.ceil(target / 40);
+  const timer = setInterval(() => {
+    current = Math.min(current + step, target);
+    el.textContent = current.toLocaleString() + suffix;
+    if (current >= target) clearInterval(timer);
+  }, 30);
+}
+
+// --- Tab switching ---
+function switchTab(name) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.currentTarget.classList.add('active');
+}
+
+// --- Generate preview ---
+function generatePreview() {
+  const preview = document.getElementById('post-preview');
+  preview.textContent = 'Generating with Claude AI...';
+  
+  setTimeout(() => {
+    const post = `🌟 TOP 10 AI NEWS AROUND THE WORLD TODAY 🌟
+📅 ${new Date().toLocaleDateString('en-IN', {weekday:'long', year:'numeric', month:'long', day:'numeric'})}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🇺🇸 #1 — OpenAI o3 Redefines AI Reasoning
+🧠 OpenAI's new o3 model just shattered every benchmark we thought was years away. It outperforms PhD-level human experts in physics, chemistry, and mathematics — not by a little, but by a LOT.
+
+What does this mean for you? Every scientific breakthrough that took researchers months may now take hours. Drug discovery, climate modelling, materials science — all accelerating. This isn't science fiction anymore.
+
+💡 Hot take: We're not ready for how fast science is about to move.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🇬🇧 #2 — DeepMind Gemini Ultra 2.0: The Benchmark Slayer
+🚀 Google DeepMind just dropped something that's making the AI community's jaws hit the floor. Gemini Ultra 2.0 scored 90%+ across ALL major AI benchmarks — MMLU, HumanEval, you name it.
+
+For developers: this means better code generation, smarter debugging, and reasoning that actually catches your logic errors before production. The competition is heating up beautifully.
+
+💡 The AI model wars are the best thing happening in tech right now.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🇨🇳 #3 — China's ERNIE 5.0 Is Here & It Means Business
+⚡ Baidu's ERNIE 5.0 isn't just another Chinese chatbot — it's a full-stack AI ecosystem. It matches GPT-4 on English tasks while demolishing all competition on Chinese-language understanding.
+
+This shows us that AI leadership won't be a winner-takes-all game. Different regions will have different champions, and that's actually great for global AI diversity.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🇩🇪 #4 — EU AI Act: Game Over for Reckless AI?
+⚖️ The EU just fired the starting gun on AI regulation enforcement. High-risk AI systems must now submit to audits, risk assessments, and transparency requirements. This affects medical AI, hiring tools, and critical infrastructure.
+
+Love it or hate it — this is the new reality. Companies that built AI responsibly are ahead. Those that didn't? Time to catch up fast.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🇯🇵 #5 — Japan Bets $10B on AI Chips
+💴 SoftBank's massive semiconductor investment signals Japan's serious intent to build AI sovereignty. Less dependence on US chips, more domestic capability. The geopolitics of AI infrastructure just got more complex.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🇮🇳 #6 — BharatGPT: AI for 1.4 Billion People
+🙏 India's IIT Delhi just launched something truly special — an AI that speaks in 22 official languages and 500+ dialects. This is what inclusive AI looks like. Not just English-centric models, but AI for everyone.
+
+As an Indian tech professional, I'm genuinely proud of this milestone. 🇮🇳
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🇺🇸 #7 — Anthropic's $4B Round: Safety AI Gets Funded
+🛡️ The fact that a safety-first AI company just raised $4 BILLION from Google and Amazon tells us something important: the market believes responsible AI is also profitable AI. Claude 4 is coming.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🇫🇷 #8 — Mistral's Open Source Win
+🥐 Vive la France! Mistral AI's 70B open-source model beating GPT-3.5 at a fraction of the cost is a massive win for AI democratisation. Open source AI is eating the world.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🇰🇷 #9 — Samsung Brings AI to Your Pocket, Offline
+📱 30% less power for on-device AI? Samsung's Exynos 2500 is making powerful AI accessible without internet, without data privacy concerns. Edge AI is the future.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🇧🇷 #10 — Latin America Enters the AI Race
+🌎 A $500M AI fund targeting 20 Latin American countries? The next wave of AI innovation might just come from LATAM. Don't sleep on emerging market AI.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💭 QUESTION FOR YOU: Which of these 10 AI stories will have the biggest impact on YOUR industry in the next 12 months?
+
+Drop your answer below! I read every comment 👇
+
+#ArtificialIntelligence #AINews #MachineLearning #Innovation #TechTrends`;
+    
+    preview.textContent = post;
+  }, 1500);
+}
+
+function copyPost() {
+  const text = document.getElementById('post-preview').textContent;
+  navigator.clipboard.writeText(text).then(() => alert('Post copied to clipboard!'));
+}
+
+function triggerPost() {
+  alert('✅ Post queued!\n\nIn production, this triggers the GitHub Actions workflow immediately.\nYour post will be live on LinkedIn within 2 minutes.');
+}
+
+function refreshNews() {
+  const btn = event.currentTarget;
+  btn.textContent = '↻ Fetching...';
+  setTimeout(() => { btn.textContent = '↻ Refresh'; alert('✅ News refreshed from NewsAPI!'); }, 2000);
+}
+
+function saveConfig() {
+  const token = document.getElementById('li-token').value || 'YOUR_LINKEDIN_TOKEN';
+  const urn = document.getElementById('li-urn').value || 'urn:li:person:YOUR_ID';
+  const ak = document.getElementById('anthropic-key').value || 'YOUR_ANTHROPIC_KEY';
+  const nk = document.getElementById('news-key').value || 'YOUR_NEWS_KEY';
+  
+  document.getElementById('config-output').value = `# Copy these to GitHub → Settings → Secrets → Actions
+
+LINKEDIN_ACCESS_TOKEN=${token}
+LINKEDIN_PERSON_ID=${urn}
+ANTHROPIC_API_KEY=${ak}
+NEWS_API_KEY=${nk}
+
+# Cron: 00 30 0 * * * (6:00 AM IST = 00:30 UTC)
+# Workflow file: .github/workflows/post-ai-news.yml`;
+}
+
+function downloadAll() {
+  alert('📦 Download package ready!\n\nIn the GitHub repo, all scripts are pre-configured:\n• .github/workflows/post-ai-news.yml\n• scripts/fetch_news.py\n• scripts/generate_post.py\n• scripts/generate_image.py\n• scripts/post_linkedin.py\n\nSee the repository for the complete automation package.');
+}
+
+// --- Day progress ---
+function updateProgress() {
+  const startDate = new Date('2025-01-01');
+  const today = new Date();
+  const days = Math.min(Math.floor((today - startDate) / 86400000) + 1, 30);
+  document.getElementById('days-count').textContent = `Day ${days} / 30`;
+  document.getElementById('progress-bar').style.width = `${(days/30)*100}%`;
+}
+
+// --- Init ---
+renderNews();
+updateCountdown();
+setInterval(updateCountdown, 60000);
+updateProgress();
+animateCount('stat-posts', 0);
+animateCount('stat-reach', 0);
+
+// Simulate posts growing
+setTimeout(() => {
+  animateCount('stat-posts', 1);
+  animateCount('stat-reach', 847);
+}, 500);
+</script>
+</body>
+</html>
