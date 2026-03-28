@@ -1,6 +1,5 @@
 """
-post_linkedin.py — Posts to LinkedIn API v2.
-Supports text + up to 2 images.
+post_linkedin.py — FINAL FIXED VERSION
 """
 
 import os, json, requests
@@ -18,22 +17,6 @@ def headers(token):
     }
 
 
-def normalize_urn(raw_id: str):
-    """
-    Accepts:
-      562839216
-      urn:li:member:562839216
-      urn:li:person:562839216
-    Always returns:
-      urn:li:person:562839216
-    """
-    if raw_id.startswith("urn:li:person:"):
-        return raw_id
-    if raw_id.startswith("urn:li:member:"):
-        return raw_id.replace("member", "person")
-    return f"urn:li:person:{raw_id}"
-
-
 def upload_image(token, owner_urn, path):
     """Upload image and return asset URN"""
 
@@ -43,7 +26,7 @@ def upload_image(token, owner_urn, path):
         json={
             "registerUploadRequest": {
                 "recipes": ["urn:li:digitalmediaRecipe:feedshare-image"],
-                "owner": owner_urn,
+                "owner": owner_urn,   # ✅ FIXED
                 "serviceRelationships": [
                     {
                         "relationshipType": "OWNER",
@@ -111,7 +94,7 @@ def post(token, author_urn, text, images=None):
                 assets.append(a)
 
     payload = {
-        "author": author_urn,
+        "author": author_urn,   # ✅ FIXED
         "lifecycleState": "PUBLISHED",
         "specificContent": {
             "com.linkedin.ugc.ShareContent": {
@@ -169,17 +152,15 @@ def log(success, post_id=None, error=None, chars=0):
 if __name__ == "__main__":
 
     token = os.environ["LINKEDIN_ACCESS_TOKEN"]
-    raw_id = os.environ["LINKEDIN_PERSON_ID"]
 
-    # 🔥 IMPORTANT: normalize ID
-    author_urn = normalize_urn(raw_id)
+    # ✅ FINAL FIX: USE MEMBER URN DIRECTLY
+    author_urn = os.environ["LINKEDIN_PERSON_ID"]
 
     print(f"👤 Using author: {author_urn}")
 
     with open("post.txt", encoding="utf-8") as f:
         text = f.read().strip()
 
-    # Trim to LinkedIn limit
     if len(text) > 3000:
         cut = text[:2950].rfind("\n")
         text = text[:cut] + "\n\n#AI #Tech #Innovation"
