@@ -33,16 +33,16 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-        run: python scripts/generate_post.py
+        run: python generate_post.py
 
       - name: 🖼 Generate Image (Free SVG)
-        run: python scripts/generate_image.py
+        run: python generate_image.py
 
       - name: 📤 Post to LinkedIn
         env:
           LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
           LINKEDIN_PERSON_ID: ${{ secrets.LINKEDIN_PERSON_ID }}
-        run: python scripts/post_linkedin.py
+        run: python post_linkedin.py
 
       - name: ✅ Done
         run: echo "✅ Posted at $(date '+%Y-%m-%d %H:%M UTC')"
