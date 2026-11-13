@@ -7,6 +7,7 @@ Source 2: Google News RSS (no key needed) — used automatically if NewsAPI
 """
 import os, json, re, html, requests
 import xml.etree.ElementTree as ET
+from urllib.parse import urlparse
 from datetime import datetime, timedelta
 
 API_KEY = os.environ.get("NEWS_API_KEY", "").strip()
@@ -21,7 +22,7 @@ COUNTRY_FLAGS = {
 COUNTRY_NAMES = {
     "us":"USA","gb":"UK","cn":"China","de":"Germany","jp":"Japan","in":"India",
     "fr":"France","kr":"South Korea","ca":"Canada","au":"Australia","sg":"Singapore",
-    "br":"Brazil","nl":"Netherlands","se":"Sweden","il":"Israel","ae":"UAE",
+    "br":"Brazil","nl":"Netherlands","se":"Sweden","il":"Israel","ae":"UAE","it":"Italy","es":"Spain",
 }
 
 QUERIES = [
@@ -33,20 +34,30 @@ QUERIES = [
     "large language model neural network latest",
 ]
 
+COUNTRY_TLDS = {".uk":"gb",".de":"de",".jp":"jp",".cn":"cn",".in":"in",".fr":"fr",".kr":"kr",".ca":"ca",".au":"au",".sg":"sg",".br":"br",".nl":"nl",".se":"se",".il":"il",".ae":"ae",".it":"it",".es":"es"}
+COUNTRY_SITES = {
+    "gb": ["bbc.","theguardian","telegraph","ft.com","reuters"],
+    "us": ["techcrunch","wired","venturebeat","theverge","wsj","nytimes","washingtonpost","bloomberg","cnn","forbes","businessinsider"],
+    "de": ["spiegel","heise","golem"],
+    "jp": ["nikkei","japantimes","asahi"],
+    "cn": ["xinhua","scmp","globaltimes"],
+    "in": ["hindustantimes","thehindu","ndtv","economictimes","indiatimes","livemint","indianexpress"],
+    "fr": ["lemonde","lefigaro","bfmtv","france24"],
+    "kr": ["koreaherald","koreatimes"],
+    "ca": ["theglobeandmail","cbc.","nationalpost"],
+    "au": ["abc.net.au","smh.com","theage"],
+    "sg": ["straitstimes","channelnewsasia"],
+    "br": ["folha","estadao","globo.com"],
+}
+
 def detect_country(url):
-    u = url.lower()
-    if any(x in u for x in [".co.uk","bbc.","guardian","telegraph"]): return "gb"
-    if any(x in u for x in ["techcrunch","wired","venturebeat","theverge","wsj","nytimes","washingtonpost","bloomberg","cnn","forbes","businessinsider"]): return "us"
-    if any(x in u for x in [".de","spiegel","heise","golem"]): return "de"
-    if any(x in u for x in [".jp","nikkei","japantimes","asahi"]): return "jp"
-    if any(x in u for x in [".cn","xinhua","scmp","globaltimes"]): return "cn"
-    if any(x in u for x in [".in","hindustantimes","thehindu","ndtv","economictimes","livemint"]): return "in"
-    if any(x in u for x in ["lemonde",".fr","lefigaro","bfmtv"]): return "fr"
-    if any(x in u for x in [".kr","koreaherald","koreatimes"]): return "kr"
-    if any(x in u for x in [".ca","globemail","cbc","nationalpost"]): return "ca"
-    if any(x in u for x in [".au","abc.net","smh","theage"]): return "au"
-    if any(x in u for x in [".sg","straitstimes","channelnewsasia"]): return "sg"
-    if any(x in u for x in [".br","folha","estadao","globo"]): return "br"
+    """Guess the publisher's country from its website address (defaults to USA)."""
+    host = urlparse(url if "//" in url else "//" + url).hostname or ""
+    host = host.lower()
+    for cc, sites in COUNTRY_SITES.items():
+        if any(x in host for x in sites): return cc
+    for tld, cc in COUNTRY_TLDS.items():
+        if host.endswith(tld): return cc
     return "us"
 
 def score(a):
@@ -57,7 +68,7 @@ def score(a):
     return s
 
 def make_article(title, description, url, source, published):
-    cc = detect_country(url + " " + source.lower().replace(" ", ""))
+    cc = detect_country(url)
     return {
         "title": title,
         "description": description or title,

@@ -156,6 +156,8 @@ def fit(text):
         if len(kept) + len(SEP) + len(block) + len(SEP) + len(footer) > MAX_CHARS:
             break
         kept += SEP + block
+    shown = kept.count(SEP)  # one separator after the header, then one per extra story
+    kept = re.sub(r"TOP \d+ AI NEWS", f"TOP {shown} AI NEWS", kept, count=1)
     result = kept + SEP + footer
     return result if len(result) <= MAX_CHARS else text[: MAX_CHARS - len(footer)].rstrip() + footer
 
