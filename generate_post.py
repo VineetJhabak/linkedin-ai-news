@@ -1,127 +1,205 @@
 """
-generate_post.py — Generates viral LinkedIn post using FREE APIs only.
+generate_post.py — Writes the LinkedIn post from news.json into post.txt.
 
-PRIMARY:   Google Gemini 2.5 Flash (ai.google.dev — FREE, 250 req/day, no credit card)
-FALLBACK:  Groq Llama 3.3 70B      (console.groq.com — FREE, generous daily limits)
+Order of attempts (all free):
+  1. Google Gemini
+  2. Groq Llama
+  3. A built-in template that needs no AI at all
 
-Both APIs are 100% free. No credit card. No charges ever.
-Get keys at:
-  Gemini: https://aistudio.google.com/app/apikey
-  Groq:   https://console.groq.com
+Step 3 means this script always produces a post, even if both AI services are down.
 """
 
-import os, json, requests
+import json
+import os
+import re
 from datetime import datetime
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY","")
-GROQ_API_KEY   = os.environ.get("GROQ_API_KEY","")
+import requests
 
-DAY_EMOJIS = {"Monday":"💪","Tuesday":"🔥","Wednesday":"⚡","Thursday":"🧠","Friday":"🎉","Saturday":"🚀","Sunday":"🌟"}
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "").strip()
 
-PROMPT_TEMPLATE = """You are a top LinkedIn AI influencer known for making complex AI news exciting and accessible to both technical and non-technical professionals.
+GEMINI_MODELS = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.0-flash"]
+GROQ_MODELS = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
 
-Today is {date}. Write a viral LinkedIn post featuring EXACTLY these Top 10 AI news stories from around the world.
+MAX_CHARS = 2900  # LinkedIn's hard limit is 3000
+SEP = "━━━━━━━━━━━━━━━"
+DAY_EMOJIS = {
+    "Monday": "💪", "Tuesday": "🔥", "Wednesday": "⚡", "Thursday": "🧠",
+    "Friday": "🎉", "Saturday": "🚀", "Sunday": "🌟",
+}
+
+PROMPT_TEMPLATE = """You are a top LinkedIn AI influencer who makes AI news exciting and easy for both technical and non-technical professionals.
+
+Today is {date}. Write a LinkedIn post covering EXACTLY these {count} AI news stories.
 
 STORIES:
 {stories}
 
-STRICT FORMAT RULES — follow exactly:
-1. First line: "{day_emoji} TOP 10 AI NEWS FROM AROUND THE WORLD 🌍"
+STRICT FORMAT — follow exactly:
+1. First line: "{day_emoji} TOP {count} AI NEWS FROM AROUND THE WORLD 🌍"
 2. Second line: "📅 {date}"
-3. Separator: "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-4. For EACH story (all 10, no skipping):
-   Line 1: [FLAG] #[NUMBER] — [PUNCHY REWRITTEN TITLE IN CAPS]
-   Line 2: [relevant emoji] [100-200 word engaging explanation — why it matters, human impact, what's surprising]
-   Line 3: 💡 [One sharp insight or hot take]
-   Line 4: "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-5. Final section:
-   "💭 QUICK POLL — Drop your number in the comments:"
-   "Which story matters most for YOUR career? 👇"
-   "Repost if you found this useful ♻️"
-   Blank line
-   "#ArtificialIntelligence #AINews #MachineLearning #Innovation #TechTrends #AI2025 #FutureOfWork #GenAI #DeepLearning #Tech"
+3. Then a line containing only: {sep}
+4. For EACH story, in order, no skipping:
+   Line 1: [FLAG] #[NUMBER] — [PUNCHY REWRITTEN TITLE IN CAPS, max 9 words]
+   Line 2: [one relevant emoji] [25-35 words: what happened and why it matters]
+   Line 3: 💡 [one sharp takeaway, max 12 words]
+   Line 4: {sep}
+5. Ending:
+   "💭 Which story matters most for YOUR career? Drop the number below 👇"
+   "♻️ Repost if this was useful"
+   (blank line)
+   "{hashtags}"
 
-TONE: Like a brilliant, enthusiastic friend in AI. Smart but never boring. Use emojis naturally throughout each story. Make each story feel urgent and relevant.
-DO NOT use asterisks, markdown, or HTML. Write plain text only. Write ALL 10 stories completely."""
+HARD LIMIT: the whole post must be under 2600 characters. Be concise.
+Only state facts found in the stories above — never invent numbers, names or quotes.
+Plain text only: no asterisks, no markdown, no HTML, no links."""
+
+
+def hashtags():
+    year = datetime.now().year
+    return f"#ArtificialIntelligence #AINews #MachineLearning #GenAI #Innovation #TechTrends #FutureOfWork #AI{year}"
 
 
 def build_prompt(articles):
-    date = datetime.now().strftime("%B %d, %Y")
-    day_emoji = DAY_EMOJIS.get(datetime.now().strftime("%A"), "🌟")
+    now = datetime.now()
     stories = ""
     for i, a in enumerate(articles, 1):
-        stories += f"\n{i}. {a['flag']} [{a['country_name']}]\nTitle: {a['title']}\nContext: {a['description']}\nSource: {a['source']}\n"
-    return PROMPT_TEMPLATE.format(date=date, day_emoji=day_emoji, stories=stories)
+        stories += (
+            f"\n{i}. {a['flag']} [{a['country_name']}]\n"
+            f"Title: {a['title']}\nContext: {a['description']}\nSource: {a['source']}\n"
+        )
+    return PROMPT_TEMPLATE.format(
+        date=now.strftime("%B %d, %Y"),
+        day_emoji=DAY_EMOJIS.get(now.strftime("%A"), "🌟"),
+        count=len(articles),
+        stories=stories,
+        sep=SEP,
+        hashtags=hashtags(),
+    )
 
 
-def call_gemini(prompt):
-    """Google Gemini 2.5 Flash — completely free (250 req/day, no card needed)."""
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"maxOutputTokens": 4096, "temperature": 0.85}
-    }
-    r = requests.post(url, json=payload, timeout=60)
+def call_gemini(prompt, model):
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    config = {"maxOutputTokens": 8192, "temperature": 0.8}
+    r = requests.post(
+        url,
+        headers={"x-goog-api-key": GEMINI_API_KEY},
+        json={"contents": [{"parts": [{"text": prompt}]}], "generationConfig": config},
+        timeout=90,
+    )
     r.raise_for_status()
-    data = r.json()
-    return data["candidates"][0]["content"]["parts"][0]["text"]
+    parts = r.json()["candidates"][0]["content"]["parts"]
+    return "".join(p.get("text", "") for p in parts)
 
 
-def call_groq(prompt):
-    """Groq Llama 3.3 70B — completely free, blazing fast."""
-    url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
-    payload = {
-        "model": "llama-3.3-70b-versatile",
-        "messages": [
-            {"role": "system", "content": "You are a top LinkedIn AI influencer. Write viral, engaging posts."},
-            {"role": "user", "content": prompt}
-        ],
-        "max_tokens": 4096,
-        "temperature": 0.85,
-    }
-    r = requests.post(url, headers=headers, json=payload, timeout=60)
+def call_groq(prompt, model):
+    r = requests.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
+        json={
+            "model": model,
+            "messages": [
+                {"role": "system", "content": "You write concise, engaging, factual LinkedIn posts."},
+                {"role": "user", "content": prompt},
+            ],
+            "max_tokens": 2048,
+            "temperature": 0.8,
+        },
+        timeout=90,
+    )
     r.raise_for_status()
     return r.json()["choices"][0]["message"]["content"]
 
 
+def template_post(articles):
+    """No-AI fallback: a clean headline digest built straight from the news data."""
+    now = datetime.now()
+    lines = [
+        f"{DAY_EMOJIS.get(now.strftime('%A'), '🌟')} TOP {len(articles)} AI NEWS FROM AROUND THE WORLD 🌍",
+        f"📅 {now.strftime('%B %d, %Y')}",
+        SEP,
+    ]
+    for i, a in enumerate(articles, 1):
+        lines.append(f"{a['flag']} #{i} — {a['title'][:140]}")
+        desc = re.sub(r"\s+", " ", a.get("description", "")).strip()
+        if desc and desc.lower() != a["title"].lower():
+            lines.append(f"📰 {desc[:150].rstrip()}{'…' if len(desc) > 150 else ''}")
+        lines.append(f"🔗 Source: {a['source']}")
+        lines.append(SEP)
+    lines += [
+        "💭 Which story matters most for YOUR career? Drop the number below 👇",
+        "♻️ Repost if this was useful",
+        "",
+        hashtags(),
+    ]
+    return "\n".join(lines)
+
+
+def clean(text):
+    """Strip markdown the model may have added and tidy whitespace."""
+    text = text.replace("**", "").replace("__", "")
+    text = re.sub(r"^#{1,6}\s+(?=\S)", "", text, flags=re.M)  # markdown headings, not hashtags
+    text = re.sub(r"^```.*$", "", text, flags=re.M)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
+
+def fit(text):
+    """Guarantee the post fits LinkedIn's limit by dropping whole stories from the end."""
+    if len(text) <= MAX_CHARS:
+        return text
+    footer = "\n💭 Which story matters most for YOUR career? 👇\n♻️ Repost if this was useful\n\n" + hashtags()
+    blocks = text.split(SEP)
+    kept = blocks[0]
+    for block in blocks[1:-1]:
+        if len(kept) + len(SEP) + len(block) + len(SEP) + len(footer) > MAX_CHARS:
+            break
+        kept += SEP + block
+    result = kept + SEP + footer
+    return result if len(result) <= MAX_CHARS else text[: MAX_CHARS - len(footer)].rstrip() + footer
+
+
+def looks_valid(text, articles):
+    return len(text) > 400 and text.count("#1") >= 1 and len(articles) > 0
+
+
 def generate(articles):
     prompt = build_prompt(articles)
-
-    # Try Gemini first (best quality, still free)
+    attempts = []
     if GEMINI_API_KEY:
-        try:
-            print("🤖 Using Google Gemini 2.5 Flash (free)...")
-            text = call_gemini(prompt)
-            print(f"✅ Gemini generated {len(text)} chars")
-            return text
-        except Exception as e:
-            print(f"⚠️ Gemini failed: {e} — trying Groq fallback...")
-
-    # Fallback: Groq Llama (also free)
+        attempts += [("Gemini", call_gemini, m) for m in GEMINI_MODELS]
     if GROQ_API_KEY:
-        try:
-            print("🤖 Using Groq Llama 3.3 70B (free)...")
-            text = call_groq(prompt)
-            print(f"✅ Groq generated {len(text)} chars")
-            return text
-        except Exception as e:
-            print(f"⚠️ Groq failed: {e}")
+        attempts += [("Groq", call_groq, m) for m in GROQ_MODELS]
 
-    raise RuntimeError("Both Gemini and Groq failed. Check your API keys in GitHub Secrets.")
+    for name, fn, model in attempts:
+        try:
+            print(f"🤖 Trying {name} ({model})...")
+            text = clean(fn(prompt, model))
+            if looks_valid(text, articles):
+                print(f"✅ {name} wrote {len(text)} characters")
+                return fit(text)
+            print(f"⚠️ {name} returned an unusable answer — trying the next option")
+        except Exception as e:  # any failure just moves on to the next option
+            msg = str(e).replace(GEMINI_API_KEY or "\0", "***").replace(GROQ_API_KEY or "\0", "***")
+            print(f"⚠️ {name} ({model}) failed: {msg[:200]}")
+
+    print("ℹ️ No AI service available — using the built-in headline template")
+    return fit(template_post(articles))
 
 
 if __name__ == "__main__":
     with open("news.json", encoding="utf-8") as f:
         articles = json.load(f)
+    if not articles:
+        raise SystemExit("❌ news.json is empty — nothing to write about.")
 
     post = generate(articles)
-
     with open("post.txt", "w", encoding="utf-8") as f:
         f.write(post)
 
-    print("\n📋 Preview:")
-    print("-"*60)
-    print(post[:600] + "...")
-    print("-"*60)
+    print(f"\n📋 Preview ({len(post)} characters):")
+    print("-" * 60)
+    print(post[:700] + ("..." if len(post) > 700 else ""))
+    print("-" * 60)
     print("✅ Saved to post.txt")

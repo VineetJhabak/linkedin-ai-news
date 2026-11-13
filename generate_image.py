@@ -1,126 +1,85 @@
 """
-generate_image.py — Creates 1-2 images for LinkedIn post. 100% FREE.
+generate_image.py — Draws one headline card (PNG) for the LinkedIn post.
 
-Method 1: Unsplash Source API (no key, no sign-up, completely free)
-Method 2: SVG infographic generated from news data (zero cost, always works)
-
-No paid APIs. No API keys needed for images.
+Uses Pillow only: no API keys, no downloads, nothing that can go offline.
+(LinkedIn does not accept SVG uploads, so the card is rendered as PNG.)
+If drawing fails for any reason the post simply goes out as text only.
 """
 
-import json, requests, os
+import json
 from datetime import datetime
-from pathlib import Path
+
+W, H = 1200, 628
+FONT_DIRS = [
+    "/usr/share/fonts/truetype/dejavu/",
+    "/usr/share/fonts/truetype/liberation/",
+    "/usr/share/fonts/dejavu/",
+]
 
 
-def fetch_unsplash(query, idx):
-    """Unsplash Source API — no API key needed, completely free."""
-    # Use multiple fallback queries if first fails
-    queries = [query, query.split()[0], "technology future", "artificial intelligence"]
-    
-    for q in queries:
-        try:
-            url = f"https://source.unsplash.com/1200x628/?{q.replace(' ',',')}"
-            r = requests.get(url, timeout=20, allow_redirects=True)
-            if r.status_code == 200 and len(r.content) > 15_000:
-                fname = f"image_{idx+1}.jpg"
-                with open(fname, "wb") as f:
-                    f.write(r.content)
-                print(f"  ✅ Unsplash image {idx+1} ({len(r.content)//1024}KB): {fname}")
-                return fname
-        except Exception as e:
-            print(f"  ⚠️ Unsplash '{q}' failed: {e}")
-    return None
+def font(size, bold=False):
+    from PIL import ImageFont
+
+    names = ["DejaVuSans-Bold.ttf", "LiberationSans-Bold.ttf"] if bold else ["DejaVuSans.ttf", "LiberationSans-Regular.ttf"]
+    for d in FONT_DIRS:
+        for n in names:
+            try:
+                return ImageFont.truetype(d + n, size)
+            except OSError:
+                continue
+    try:
+        return ImageFont.load_default(size)
+    except TypeError:
+        return ImageFont.load_default()
 
 
-def make_svg_image(articles, idx):
-    """
-    Generates a professional SVG infographic card — zero cost, always works.
-    LinkedIn renders SVG attachments fine.
-    """
-    today = datetime.now().strftime("%B %d, %Y")
-    
-    palettes = [
-        {"bg1":"#0f0c29","bg2":"#302b63","accent":"#7c3aed","accent2":"#a78bfa","bar":"#6d28d9"},
-        {"bg1":"#0a192f","bg2":"#0e2a47","accent":"#06b6d4","accent2":"#67e8f9","bar":"#0891b2"},
-    ]
-    p = palettes[idx % len(palettes)]
-    
-    # Build news rows for the infographic
-    news_rows = ""
-    flags_and_titles = [(a["flag"], a["country_name"], a["title"][:55]+"…" if len(a["title"])>55 else a["title"]) for a in articles[:5]]
-    
-    y = 310
-    for i, (flag, country, title) in enumerate(flags_and_titles):
-        news_rows += f"""
-        <rect x="60" y="{y}" width="1080" height="52" rx="6" fill="rgba(255,255,255,0.04)"/>
-        <text x="80" y="{y+33}" font-family="Arial,sans-serif" font-size="22" fill="{p['accent2']}" font-weight="bold">#{i+1}</text>
-        <text x="120" y="{y+33}" font-family="Arial,sans-serif" font-size="20">{flag}</text>
-        <text x="155" y="{y+33}" font-family="Arial,sans-serif" font-size="16" fill="rgba(255,255,255,0.5)" font-style="italic">{country} ·</text>
-        <text x="240" y="{y+33}" font-family="Arial,sans-serif" font-size="17" fill="rgba(255,255,255,0.88)">{title}</text>"""
-        y += 62
-    
-    svg = f"""<?xml version="1.0" encoding="UTF-8"?>
-<svg width="1200" height="628" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="{p['bg1']}"/>
-      <stop offset="100%" stop-color="{p['bg2']}"/>
-    </linearGradient>
-    <linearGradient id="bar" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="{p['accent']}"/>
-      <stop offset="100%" stop-color="{p['accent2']}"/>
-    </linearGradient>
-  </defs>
+def ascii_safe(text):
+    """Fonts on the build machine cannot draw emoji, so keep basic characters only."""
+    return "".join(c if 31 < ord(c) < 0x2500 else " " for c in text).strip()
 
-  <!-- Background -->
-  <rect width="1200" height="628" fill="url(#bg)"/>
-  
-  <!-- Subtle grid -->
-  <g opacity="0.04" stroke="white" stroke-width="0.5">
-    {''.join(f'<line x1="0" y1="{y*50}" x2="1200" y2="{y*50}"/>' for y in range(13))}
-    {''.join(f'<line x1="{x*100}" y1="0" x2="{x*100}" y2="628"/>' for x in range(13))}
-  </g>
-  
-  <!-- Top accent bar -->
-  <rect x="0" y="0" width="1200" height="5" fill="url(#bar)"/>
-  
-  <!-- Glow circles -->
-  <circle cx="150" cy="150" r="200" fill="{p['accent']}" opacity="0.06"/>
-  <circle cx="1100" cy="500" r="180" fill="{p['accent2']}" opacity="0.06"/>
-  
-  <!-- AI Badge -->
-  <rect x="60" y="52" width="148" height="38" rx="19" fill="{p['accent']}" opacity="0.85"/>
-  <text x="134" y="77" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" font-weight="bold" fill="white">🤖 AI NEWS</text>
-  
-  <!-- Main Headline -->
-  <text x="60" y="175" font-family="Arial,sans-serif" font-size="52" font-weight="900" fill="white">Top 10 AI Stories</text>
-  <text x="60" y="238" font-family="Arial,sans-serif" font-size="52" font-weight="900" fill="url(#bar)">From Around The World 🌍</text>
-  <text x="60" y="282" font-family="Arial,sans-serif" font-size="20" fill="rgba(255,255,255,0.45)">{today}</text>
-  
-  <!-- News rows -->
-  {news_rows}
-  
-  <!-- Bottom hashtags -->
-  <text x="60" y="606" font-family="Arial,sans-serif" font-size="15" fill="rgba(255,255,255,0.3)">#ArtificialIntelligence  #AINews  #MachineLearning  #Innovation  #TechTrends</text>
-</svg>"""
 
-    fname = f"image_{idx+1}.svg"
-    with open(fname, "w", encoding="utf-8") as f:
-        f.write(svg)
-    print(f"  ✅ SVG infographic {idx+1} saved: {fname}")
+def shorten(draw, text, fnt, max_width):
+    if draw.textlength(text, font=fnt) <= max_width:
+        return text
+    while text and draw.textlength(text + "…", font=fnt) > max_width:
+        text = text[:-1]
+    return text.rstrip() + "…"
+
+
+def make_card(articles, fname="image_1.png"):
+    from PIL import Image, ImageDraw
+
+    top, bottom = (15, 12, 41), (48, 43, 99)
+    accent, accent2 = (124, 58, 237), (167, 139, 250)
+
+    img = Image.new("RGB", (W, H))
+    d = ImageDraw.Draw(img)
+    for y in range(H):
+        t = y / H
+        d.line([(0, y), (W, y)], fill=tuple(int(a + (b - a) * t) for a, b in zip(top, bottom)))
+    d.rectangle([0, 0, W, 6], fill=accent)
+
+    d.rounded_rectangle([60, 44, 210, 82], radius=19, fill=accent)
+    d.text((135, 63), "AI NEWS", font=font(17, True), fill="white", anchor="mm")
+    d.text((60, 100), "Top AI Stories", font=font(54, True), fill="white")
+    d.text((60, 164), "From Around The World", font=font(54, True), fill=accent2)
+    d.text((60, 236), datetime.now().strftime("%B %d, %Y"), font=font(21), fill=(170, 170, 200))
+
+    y = 282
+    title_font, meta_font, num_font = font(21), font(17), font(22, True)
+    for i, a in enumerate(articles[:5], 1):
+        d.rounded_rectangle([60, y, W - 60, y + 52], radius=8, fill=(40, 36, 84))
+        d.text((80, y + 26), f"#{i}", font=num_font, fill=accent2, anchor="lm")
+        country = ascii_safe(a.get("country_name", "Global"))
+        d.text((128, y + 26), country, font=meta_font, fill=(160, 160, 195), anchor="lm")
+        x = 128 + d.textlength(country, font=meta_font) + 16
+        title = shorten(d, ascii_safe(a["title"]), title_font, W - 80 - x)
+        d.text((x, y + 26), title, font=title_font, fill=(235, 235, 245), anchor="lm")
+        y += 60
+
+    d.text((60, 598), "#ArtificialIntelligence  #AINews  #MachineLearning  #Innovation", font=font(16), fill=(130, 130, 170), anchor="lm")
+    img.save(fname, "PNG", optimize=True)
     return fname
-
-
-def get_image_query(article):
-    """Extract a simple Unsplash search query from article title."""
-    title = article["title"].lower()
-    if any(x in title for x in ["robot","robotics"]): return "robot technology"
-    if any(x in title for x in ["chip","semiconductor","gpu","nvidia"]): return "computer chip semiconductor"
-    if any(x in title for x in ["regulation","policy","law","government"]): return "government technology policy"
-    if any(x in title for x in ["health","medical","medicine","drug"]): return "medical AI technology"
-    if any(x in title for x in ["fund","invest","billion","startup"]): return "tech startup investment"
-    if any(x in title for x in ["brain","neural","research"]): return "neural network brain technology"
-    return "artificial intelligence technology future"
 
 
 if __name__ == "__main__":
@@ -128,20 +87,11 @@ if __name__ == "__main__":
         articles = json.load(f)
 
     images = []
-    print("🖼 Generating images (free)...")
+    try:
+        images.append(make_card(articles))
+        print(f"✅ Image ready: {images[0]}")
+    except Exception as e:
+        print(f"⚠️ Could not draw the image ({e}) — the post will be text only")
 
-    for idx in range(2):
-        query = get_image_query(articles[idx] if idx < len(articles) else articles[0])
-        print(f"\n  Image {idx+1}: '{query}'")
-        
-        fname = fetch_unsplash(query, idx)
-        if not fname:
-            fname = make_svg_image(articles, idx)
-        
-        if fname:
-            images.append(fname)
-
-    with open("images.json","w") as f:
+    with open("images.json", "w") as f:
         json.dump({"images": images, "generated_at": datetime.now().isoformat()}, f)
-
-    print(f"\n✅ {len(images)} image(s) ready: {images}")
