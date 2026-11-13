@@ -1,0 +1,9 @@
+[
+  {
+    "timestamp": "2026-11-13T18:27:08+00:00",
+    "success": false,
+    "post_id": null,
+    "chars": 0,
+    "error": "LinkedIn rejected the access token"
+  }
+]
