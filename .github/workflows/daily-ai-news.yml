@@ -1,0 +1,101 @@
+name: Daily AI News to LinkedIn
+
+on:
+  schedule:
+    # 00:30 UTC = 6:00 AM IST. GitHub may start scheduled runs late.
+    - cron: '30 0 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Test only — run every check but do NOT publish to LinkedIn'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write   # save post_log.json (also keeps the schedule from being auto-disabled)
+  issues: write     # open a plain-English issue when something needs your attention
+
+concurrency:
+  group: daily-ai-news
+  cancel-in-progress: false
+
+jobs:
+  post-ai-news:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Fetch top AI news
+        env:
+          NEWS_API_KEY: ${{ secrets.NEWS_API_KEY }}
+        run: python fetch_news.py
+
+      - name: Write the post
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: python generate_post.py
+
+      - name: Draw the image
+        run: python generate_image.py
+
+      - name: Post to LinkedIn
+        env:
+          LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+          LINKEDIN_PERSON_ID: ${{ secrets.LINKEDIN_PERSON_ID }}
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+        run: python post_linkedin.py
+
+      - name: Show the post in the run summary
+        if: always()
+        run: |
+          {
+            echo "## Post text"
+            echo '```'
+            cat post.txt 2>/dev/null || echo "(no post was generated)"
+            echo '```'
+            if [ -f failure_reason.md ]; then echo "## What went wrong"; cat failure_reason.md; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Save run history
+        if: always() && github.ref == 'refs/heads/main'
+        continue-on-error: true
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add post_log.json 2>/dev/null || exit 0
+          git diff --cached --quiet && exit 0
+          git commit -m "Update post log [skip ci]"
+          git pull --rebase --autostash origin main
+          git push origin HEAD:main
+
+      - name: Open an issue explaining the failure
+        if: failure()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="LinkedIn auto-poster needs attention"
+          if [ ! -f failure_reason.md ]; then
+            printf '### A step failed before posting\n\nOpen the run log to see which step failed.\n' > failure_reason.md
+          fi
+          printf '\n---\nRun log: %s\n' "$RUN_URL" >> failure_reason.md
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "in:title \"$title\"" --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body-file failure_reason.md
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file failure_reason.md
+          fi
