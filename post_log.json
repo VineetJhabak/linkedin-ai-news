@@ -12,5 +12,12 @@
     "post_id": null,
     "chars": 0,
     "error": "LinkedIn rejected the access token"
+  },
+  {
+    "timestamp": "2026-11-14T06:51:45+00:00",
+    "success": false,
+    "post_id": null,
+    "chars": 0,
+    "error": "LinkedIn rejected the access token"
   }
 ]
